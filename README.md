@@ -8,6 +8,45 @@
 
 단순한 무선 조종 기능뿐 아니라 컨트롤러 입력 처리, 명령 데이터 구조화, 무선 패킷 직렬화·역직렬화 과정을 분리하여 각 기능을 독립적으로 관리할 수 있도록 구현했습니다.
 
+<p align="center">
+  <img src="./docs/images/drone_and_controller.jpg"
+       alt="Custom drone and ESP32-S3 controller"
+       width="800">
+</p>
+
+<p align="center">
+  직접 제작한 드론과 전용 컨트롤러<br>
+  Custom drone and dedicated controller
+</p>
+
+<table>
+  <tr>
+    <td align="center" width="50%">
+      <img src="./docs/images/kss_drone_controller1.jpg"
+           alt="Front view of the custom drone controller"
+           width="100%"><br>
+      컨트롤러 앞면 / Controller front
+    </td>
+    <td align="center" width="50%">
+      <img src="./docs/images/kss_drone_controller2.jpg"
+           alt="Rear view of the custom drone controller"
+           width="100%"><br>
+      컨트롤러 뒷면 / Controller rear
+    </td>
+  </tr>
+</table>
+
+<p align="center">
+  <img src="./docs/images/xiao_esp32s3.jpg"
+       alt="Seeed Studio XIAO ESP32-S3 development board"
+       width="420">
+</p>
+
+<p align="center">
+  컨트롤러에 사용한 Seeed Studio XIAO ESP32-S3<br>
+  Seeed Studio XIAO ESP32-S3 used in the controller
+</p>
+
 ### 개발 환경
 
 | 항목 | 내용 |
