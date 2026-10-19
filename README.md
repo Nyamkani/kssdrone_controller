@@ -97,21 +97,38 @@
 
 > 실제 버튼 매핑과 조종 방향은 펌웨어 설정에 따라 변경할 수 있습니다.
 
-### 데이터 흐름
+### 프로그램 구조
+
+실제 펌웨어는 PS2 입력 수집, 메인 컨트롤러 FSM, ESP-NOW 송수신을 **서로 다른 FreeRTOS Task**로 실행합니다. 입력과 송신 명령은 더블 버퍼로 전달하고, 드론에서 받은 telemetry는 수신 큐를 통해 메인 컨트롤러로 전달합니다.
 
 ```mermaid
-flowchart LR
-    A[PS2 Controller] --> B[GPIO Bit-Bang Interface]
-    B --> C[Input Processing]
-    C --> D[Control Packet Parser]
-    D --> E[ESP-NOW TX/RX]
-    E <--> F[Drone Flight Controller]
+flowchart TD
+    PAD["PS2 Compatible Pad"] --> BIT["Ps2Pad / GPIO Bit-Bang"]
+    subgraph ESP32["ESP32-S3 / FreeRTOS"]
+        INPUT["ControllerInput Task · 100 Hz"]
+        PADBUF["PadState Double Buffer"]
+        MAIN["KssController Main Task · 100 Hz"]
+        MAP["Buttons / Deadband / Expo / Filters / Throttle"]
+        CMD["ControlPacket / Double Buffer"]
+        TX["EspNowInterface Task · 200 Hz"]
+        TXCB["ESP-NOW TX Callback"]
+        RXCB["ESP-NOW RX Callback"]
+        TELQ["Telemetry Queue"]
+        LED["WS2812 Status LEDs"]
+        INPUT --> PADBUF --> MAIN --> MAP --> CMD --> TX
+        TX --> TXCB
+        RXCB --> TELQ --> MAIN
+        MAIN --> LED
+    end
+    BIT --> INPUT
+    TX <--> RADIO["ESP-NOW Link"]
+    RADIO <--> DRONE["Drone FC · ESP-NOW Version"]
 ```
 
-1. 비트뱅 인터페이스가 PS2 컨트롤러의 버튼과 스틱 데이터를 읽습니다.
-2. 입력 처리 단계에서 데드밴드, 입력 곡선, 저역 통과 필터 및 변화율 제한을 적용합니다.
-3. 처리된 입력을 Roll, Pitch, Yaw, Throttle 및 상태 명령이 포함된 제어 패킷으로 변환합니다.
-4. ESP-NOW를 통해 패킷을 드론으로 전송하고 필요한 상태 데이터를 수신합니다.
+- **ControllerInput (100 Hz):** Ps2Pad GPIO 비트뱅으로 스틱·버튼 입력을 읽고 최신 PadState를 더블 버퍼에 저장합니다.
+- **KssController (100 Hz):** INIT / RUN / STOP / ERR 상태 머신에서 입력 보정, 버튼 이벤트, throttle 처리와 ControlPacket 생성을 수행합니다.
+- **EspNowInterface (200 Hz):** 더블 버퍼의 최신 명령을 ESP-NOW로 송신합니다. 송신 결과는 콜백으로 관리하고, 수신 telemetry는 큐에 저장합니다.
+- **상태 출력:** 메인 컨트롤러는 수신 telemetry 및 링크 상태를 사용하여 WS2812 LED를 갱신합니다.
 
 ### 구현 시 고려 사항
 
@@ -199,21 +216,38 @@ The firmware separates controller input handling, command processing, packet ser
 
 > The button mapping and control directions can be changed in the firmware configuration.
 
-### Data Flow
+### Program Structure
+
+The firmware runs PS2 input acquisition, the controller FSM, and ESP-NOW transport in **separate FreeRTOS tasks**. Double buffers pass the latest input and outbound command between tasks; a receive queue delivers drone telemetry to the main controller.
 
 ```mermaid
-flowchart LR
-    A[PS2 Controller] --> B[GPIO Bit-Bang Interface]
-    B --> C[Input Processing]
-    C --> D[Control Packet Parser]
-    D --> E[ESP-NOW TX/RX]
-    E <--> F[Drone Flight Controller]
+flowchart TD
+    PAD["PS2 Compatible Pad"] --> BIT["Ps2Pad / GPIO Bit-Bang"]
+    subgraph ESP32["ESP32-S3 / FreeRTOS"]
+        INPUT["ControllerInput Task · 100 Hz"]
+        PADBUF["PadState Double Buffer"]
+        MAIN["KssController Main Task · 100 Hz"]
+        MAP["Buttons / Deadband / Expo / Filters / Throttle"]
+        CMD["ControlPacket / Double Buffer"]
+        TX["EspNowInterface Task · 200 Hz"]
+        TXCB["ESP-NOW TX Callback"]
+        RXCB["ESP-NOW RX Callback"]
+        TELQ["Telemetry Queue"]
+        LED["WS2812 Status LEDs"]
+        INPUT --> PADBUF --> MAIN --> MAP --> CMD --> TX
+        TX --> TXCB
+        RXCB --> TELQ --> MAIN
+        MAIN --> LED
+    end
+    BIT --> INPUT
+    TX <--> RADIO["ESP-NOW Link"]
+    RADIO <--> DRONE["Drone FC · ESP-NOW Version"]
 ```
 
-1. The bit-bang interface reads button and analog-stick data from the PS2 controller.
-2. Input processing applies deadband, response curves, low-pass filtering, and slew-rate limiting.
-3. The processed values are converted into a packet containing roll, pitch, yaw, throttle, and state commands.
-4. ESP-NOW sends the packet to the drone and receives the required status data.
+- **ControllerInput (100 Hz):** Reads sticks and buttons through the Ps2Pad GPIO bit-bang interface and publishes the latest PadState to a double buffer.
+- **KssController (100 Hz):** Runs the INIT / RUN / STOP / ERR FSM, applies input conditioning and button events, manages throttle, and builds ControlPacket commands.
+- **EspNowInterface (200 Hz):** Sends the latest buffered control command over ESP-NOW, tracks send completion through callbacks, and queues incoming telemetry.
+- **Status output:** The main controller updates WS2812 LEDs using telemetry and link state.
 
 ### Implementation Considerations
 
